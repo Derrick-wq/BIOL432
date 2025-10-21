@@ -1,6 +1,11 @@
 ---
 title: "Assignment7"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cerulean
 date: "2025-10-21"
 Open RStudio and clone this repository:  
    git clone https://github.com/Derrick-wq/BIOL432.git
@@ -12,6 +17,8 @@ knitr::opts_chunk$set(echo = TRUE)
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 install.packages("rentrez")
 library(rentrez)
+library(ggplot2)
+library(dplyr)
 
 NcbiIds <- c("HQ433692.1","HQ433694.1","HQ433691.1")
 Bburg <- entrez_fetch(db = "nuccore", id = NcbiIds, rettype = "fasta")
@@ -81,11 +88,35 @@ for (i in 1:Length) {
 SeqLength <- nchar(UnknownSeq)
 SeqSimilarity <- round(AAA / SeqLength * 100, 2)
 cat(" Seq Similarity：", SeqSimilarity, "%\n")
+```
+##Unknown_Length: Unknown sequence length (250 bp)
+##Reference_Length: Total length of reference 16S sequence (1490 bp)
+##Similarity_Percent: The similarity calculated after base-by-base alignment (27.2%)
+##Reference_Name: Species name and sequence ID from GenBank
+```{r Visualization}
+MatchStatus <- ifelse(RefBases == UnkBases, 1, 0)
+df <- data.frame(Position = 1:Length, Match = MatchStatus)
+
+df_summary <- df %>%
+  mutate(group = ceiling(Position / 10)) %>%
+  group_by(group) %>%
+  summarise(Match_Rate = mean(Match), .groups = "drop")
+
+ggplot(df_summary, aes(x = (group - 0.5) * 10, y = Match_Rate)) +
+  geom_col(width = 10, fill = "red") +
+  geom_hline(yintercept = mean(df$Match), linetype = "dashed", color = "black") +
+  scale_x_continuous(limits = c(0, Length), breaks = seq(0, Length, by = 50)) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(title = "Distribution of Matches per 10 bp Window",
+       subtitle = paste("Overall Similarity:", SeqSimilarity, "%"),
+       x = "Base Position (10 bp)",
+       y = "Proportion of Matches") +
+  theme_minimal()
 
 if (SeqSimilarity > 80) {
-  message("The sequence is very similar to reference bacterial sequences and is likely from the genus Borrelia.")
+  message("The sequence is very similar(high similarity)(SeqSimilarity: ",  SeqSimilarity, "%) to reference bacterial sequences and is likely from the genus Borrelia.")
 } else {
-  message("This sequence is quite different from the reference bacterial sequence and may be of human or other origin.")
+  message("This sequence is quite different(low similarity)(SeqSimilarity: ",  SeqSimilarity, "%) from the reference bacterial sequence and may be of human or other origin.")
 }
 
 Result1 <- data.frame(Unknown_Length = nchar(UnknownSeq),
@@ -94,7 +125,3 @@ Result1 <- data.frame(Unknown_Length = nchar(UnknownSeq),
                      Reference_Name = RefHeader)
 Result1
 ```
-##Unknown_Length: Unknown sequence length (250 bp)
-##Reference_Length: Total length of reference 16S sequence (1490 bp)
-##Similarity_Percent: The similarity calculated after base-by-base alignment (27.2%)
-##Reference_Name: Species name and sequence ID from GenBank
