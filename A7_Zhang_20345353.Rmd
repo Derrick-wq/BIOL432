@@ -1,0 +1,100 @@
+---
+title: "Assignment7"
+output: html_document
+date: "2025-10-21"
+Open RStudio and clone this repository:  
+   git clone https://github.com/Derrick-wq/BIOL432.git
+Author: Yudong Zhang 20345353
+---
+
+```{r Part1}
+knitr::opts_chunk$set(echo = TRUE)
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+install.packages("rentrez")
+library(rentrez)
+
+NcbiIds <- c("HQ433692.1","HQ433694.1","HQ433691.1")
+Bburg <- entrez_fetch(db = "nuccore", id = NcbiIds, rettype = "fasta")
+cat(Bburg)
+
+TempList <- strsplit(Bburg, split = ">")
+TempVector <- TempList[[1]]
+NoEmpty <- c()
+for (i in 1:length(TempVector)) {
+   if (TempVector[i] != "") {
+     NoEmpty <- c(NoEmpty, TempVector[i])
+   }
+}
+SequencesRaw <- NoEmpty
+print(SequencesRaw)
+
+Seq1Parts <- strsplit(SequencesRaw[1], "\n")[[1]]
+Seq2Parts <- strsplit(SequencesRaw[2], "\n")[[1]]
+Seq3Parts <- strsplit(SequencesRaw[3], "\n")[[1]]
+header1 <- Seq1Parts[1]
+header2 <- Seq2Parts[1]
+header3 <- Seq3Parts[1]
+sequence1 <- paste(Seq1Parts[-1], collapse = "")
+sequence2 <- paste(Seq2Parts[-1], collapse = "")
+sequence3 <- paste(Seq3Parts[-1], collapse = "")
+
+Name <- c(header1, header2, header3)
+Sequence <- c(sequence1, sequence2, sequence3)
+Sequences <- data.frame(Name, Sequence)
+Sequences
+```
+
+```{r Part2}
+UnknownSeq <- paste0(
+  "GCCTGATGGAGGGGGATAACTACTGGAAACGGTAGCTAATACCGCATGAC",
+  "CTCGCAAGAGCAAAGTGGGGGACCTTAGGGCCTCACGCCATCGGATGAAC",
+  "CCAGATGGGATTAGCTAGTAGGTGGGGTAATGGCTCACCTAGGCGACGAT",
+  "CCCTAGCTGGTCTGAGAGGATGACCAGCCACACTGGAACTGAGACACGGT",
+  "CCAGACTCCTACGGGAGGCAGCAGTGGGGAATATTGCACAATGGGCGCAA"
+)
+cat("UnknownSeq Length：", nchar(UnknownSeq), "bp\n")
+
+SearchTerm <- "Borrelia burgdorferi 16S[Title] OR 16S ribosomal RNA"
+Results <- entrez_search(db = "nuccore", term = SearchTerm, retmax = 3)
+Results
+
+TopIds <- Results$ids
+fetched <- entrez_fetch(db = "nuccore", id = TopIds, rettype = "fasta")
+Parts <- strsplit(fetched, ">")[[1]]
+Parts <- Parts[Parts != ""]
+ref1 <- strsplit(Parts[1], "\n")[[1]]
+RefHeader <- ref1[1]
+RefSeq <- paste(ref1[-1], collapse = "")
+cat("Reference Seq Name：", RefHeader, "\n")
+cat("Reference Seq Length：", nchar(RefSeq), "bp\n")
+
+Length <- min(nchar(RefSeq), nchar(UnknownSeq))
+RefBases <- strsplit(RefSeq, "")[[1]][1:Length]
+UnkBases <- strsplit(UnknownSeq, "")[[1]][1:Length]
+
+AAA <- 0
+for (i in 1:Length) {
+  if (RefBases[i] == UnkBases[i]) {
+    AAA <- AAA + 1
+  }
+}
+SeqLength <- nchar(UnknownSeq)
+SeqSimilarity <- round(AAA / SeqLength * 100, 2)
+cat(" Seq Similarity：", SeqSimilarity, "%\n")
+
+if (SeqSimilarity > 80) {
+  message("The sequence is very similar to reference bacterial sequences and is likely from the genus Borrelia.")
+} else {
+  message("This sequence is quite different from the reference bacterial sequence and may be of human or other origin.")
+}
+
+Result1 <- data.frame(Unknown_Length = nchar(UnknownSeq),
+                     Reference_Length = nchar(RefSeq),
+                     Similarity_Percent = SeqSimilarity,
+                     Reference_Name = RefHeader)
+Result1
+```
+##Unknown_Length: Unknown sequence length (250 bp)
+##Reference_Length: Total length of reference 16S sequence (1490 bp)
+##Similarity_Percent: The similarity calculated after base-by-base alignment (27.2%)
+##Reference_Name: Species name and sequence ID from GenBank
